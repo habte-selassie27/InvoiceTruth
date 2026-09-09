@@ -39,3 +39,39 @@ leader's result only if all seven binding keys match exactly:
 Free-form text is never compared or stored. Content hashes are omitted
 from consensus: live repos may legitimately differ between fetches, so
 the semantic fields — not byte equality — are the binding signal.
+
+## Priority rule table
+
+Evaluated top-down; the first matching rule decides.
+
+| Priority | Condition | Verdict |
+|---|---|---|
+| 0 | `source_reachable == False` | `UNRESOLVED` (status `UNRESOLVABLE`, retry allowed) |
+| 1 | `fabrication_signal == CONFIRMED` | `FABRICATED` |
+| 2 | `commit_coverage == NONE` (timesheet alone is insufficient) | `FABRICATED` |
+| 3 | `SUSPECTED` + `MAJOR_GAP` | `FABRICATED` |
+| 4 | `supported_hours * rate == 0` | `FABRICATED` |
+| 5 | `hours_alignment == MAJOR_GAP` | `INFLATED` |
+| 6 | over-billed beyond tolerance (model label **or** recomputed math) | `INFLATED` |
+| 7 | (`MINOR_GAP` or `SUSPECTED`) and outside tolerance | `INFLATED` |
+| 8 | all checks pass | `PAYABLE` |
+
+Under-billing (`claimed < expected`) with `CONSISTENT` alignment and no
+suspicion stays `PAYABLE`: the freelancer simply claimed less than the
+evidence supports.
+
+## Integer-only math
+
+All money is in the smallest currency unit; hours are integers.
+
+```
+expected = supported_hours * rate_per_hour
+delta    = |claimed_amount - expected|
+within   = (delta * 10) <= expected        # delta <= 10% without division
+over     = claimed_amount > expected and not within
+```
+
+Boundary behavior (rate `10000`, 40h supported, expected `400000`):
+
+- `claimed = 440000` → `delta * 10 = 400000 <= 400000` → within → `PAYABLE`
+- `claimed = 440001` → `delta * 10 = 400010 > 400000` → outside → `INFLATED`
