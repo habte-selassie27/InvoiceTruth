@@ -206,3 +206,121 @@ class Verdict:
     INFLATED = "INFLATED"
     FABRICATED = "FABRICATED"
     UNRESOLVED = "UNRESOLVED"  # stored only when status = UNRESOLVABLE
+
+
+# ---------------------------------------------------------------------------
+# Storage record
+# ---------------------------------------------------------------------------
+
+try:
+    @allow_storage
+    @dataclass
+    class InvoiceRecord:
+        opener: str
+        rate_per_hour: u256
+        claimed_hours: u256
+        claimed_amount: u256
+        timesheet_url: str
+        repo_url: str
+        timesheet_digest: str
+        repo_digest: str
+        status: str
+        verdict: str
+        commit_coverage: str
+        hours_alignment: str
+        amount_alignment: str
+        fabrication_signal: str
+        supported_hours: u256
+        assessed_count: u256
+        opened_at: u256
+except Exception:
+    # Fallback for stub environments where @dataclass composition differs
+    from dataclasses import dataclass
+
+    @dataclass
+    class InvoiceRecord:  # type: ignore[no-redef]
+        opener: str = ""
+        rate_per_hour: int = 0
+        claimed_hours: int = 0
+        claimed_amount: int = 0
+        timesheet_url: str = ""
+        repo_url: str = ""
+        timesheet_digest: str = ""
+        repo_digest: str = ""
+        status: str = "PENDING"
+        verdict: str = ""
+        commit_coverage: str = ""
+        hours_alignment: str = ""
+        amount_alignment: str = ""
+        fabrication_signal: str = ""
+        supported_hours: int = 0
+        assessed_count: int = 0
+        opened_at: int = 0
+
+
+# ---------------------------------------------------------------------------
+# Contract
+# ---------------------------------------------------------------------------
+
+class InvoiceTruthContract(gl.Contract):  # type: ignore
+    owner: str
+    invoice_count: u256
+    invoices: TreeMap[u256, InvoiceRecord]  # type: ignore
+    max_invoices: u256
+
+    def __init__(self) -> None:
+        self.owner = gl.message.sender_address
+        self.invoice_count = u256(0)
+        self.max_invoices = u256(500)
+
+    # -------------------------------------------------------------------
+    # open_invoice
+    # -------------------------------------------------------------------
+
+    @gl.public.write
+    def open_invoice(
+        self,
+        rate_per_hour: u256,
+        claimed_hours: u256,
+        claimed_amount: u256,
+        timesheet_url: str,
+        repo_url: str,
+    ) -> u256:
+        """Seal an invoice for verification.
+
+        Stores rate/hours/amount plus both evidence URLs immutably and
+        commits to SHA-256(URL) digests verified at assessment time.
+        Returns the invoice ID.
+        """
+        assert self.invoice_count < self.max_invoices, "Registry full"
+        validate_open_params(
+            int(rate_per_hour),
+            int(claimed_hours),
+            int(claimed_amount),
+            timesheet_url,
+            repo_url,
+        )
+
+        invoice_id = self.invoice_count
+        rec = InvoiceRecord(
+            opener=gl.message.sender_address,
+            rate_per_hour=rate_per_hour,
+            claimed_hours=claimed_hours,
+            claimed_amount=claimed_amount,
+            timesheet_url=timesheet_url,
+            repo_url=repo_url,
+            timesheet_digest=url_digest(timesheet_url),
+            repo_digest=url_digest(repo_url),
+            status=InvoiceStatus.PENDING,
+            verdict="",
+            commit_coverage="",
+            hours_alignment="",
+            amount_alignment="",
+            fabrication_signal="",
+            supported_hours=u256(0),
+            assessed_count=u256(0),
+            opened_at=u256(gl.message.block_number),
+        )
+        self.invoices[invoice_id] = rec
+        self.invoice_count = invoice_id + u256(1)
+        return invoice_id
