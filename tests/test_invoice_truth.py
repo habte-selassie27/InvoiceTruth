@@ -82,3 +82,81 @@ class TestVerdictDerivation:
             claimed_amount=500000,
         )
         assert verdict == "INFLATED"
+
+    def test_05_fabricated_no_commits_no_timesheet(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="NONE",
+            hours_alignment="UNVERIFIABLE",
+            amount_alignment="OVERSTATED",
+            fabrication_signal="NONE",
+            supported_hours=0,
+            rate_per_hour=10000,
+            claimed_amount=400000,
+        )
+        assert verdict == "FABRICATED"
+
+    def test_06_fabricated_no_commits_timesheet_present(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="NONE",
+            hours_alignment="CONSISTENT",
+            amount_alignment="EXACT",
+            fabrication_signal="NONE",
+            supported_hours=0,
+            rate_per_hour=10000,
+            claimed_amount=400000,
+        )
+        assert verdict == "FABRICATED"
+
+    def test_07_fabricated_confirmed_signal(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="FULL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="EXACT",
+            fabrication_signal="CONFIRMED",
+            supported_hours=40,
+            rate_per_hour=10000,
+            claimed_amount=400000,
+        )
+        assert verdict == "FABRICATED"
+
+    def test_08_fabricated_suspected_with_major_gap(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="PARTIAL",
+            hours_alignment="MAJOR_GAP",
+            amount_alignment="OVERSTATED",
+            fabrication_signal="SUSPECTED",
+            supported_hours=10,
+            rate_per_hour=10000,
+            claimed_amount=400000,
+        )
+        assert verdict == "FABRICATED"
+
+    def test_09_unresolved_source_unreachable(self):
+        verdict = derive_verdict(
+            source_reachable=False,
+            commit_coverage="NONE",
+            hours_alignment="UNVERIFIABLE",
+            amount_alignment="OVERSTATED",
+            fabrication_signal="NONE",
+            supported_hours=0,
+            rate_per_hour=10000,
+            claimed_amount=400000,
+        )
+        assert verdict == "UNRESOLVED"
+
+    def test_10_fabricated_zero_supported_hours(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="PARTIAL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="EXACT",
+            fabrication_signal="NONE",
+            supported_hours=0,
+            rate_per_hour=10000,
+            claimed_amount=400000,
+        )
+        assert verdict == "FABRICATED"
