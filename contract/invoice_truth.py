@@ -538,6 +538,11 @@ Rules:
         if not result["source_reachable"]:
             rec.status = InvoiceStatus.UNRESOLVABLE
             rec.verdict = Verdict.UNRESOLVED
+            rec.commit_coverage = str(result["commit_coverage"])
+            rec.hours_alignment = str(result["hours_alignment"])
+            rec.amount_alignment = str(result["amount_alignment"])
+            rec.fabrication_signal = str(result["fabrication_signal"])
+            rec.supported_hours = supported_hours
             rec.assessed_count = rec.assessed_count + u256(1)
             self.invoices[invoice_id] = rec
             return
