@@ -1,4 +1,17 @@
-# InvoiceTruth — Freelance Hours Verifier
+<p align="center">
+  <img src="Images/logo.svg" width="400" alt="InvoiceTruth">
+</p>
+
+<p align="center">
+  <em>Intelligent Contract that verifies freelance invoices via validator consensus</em>
+</p>
+
+<p align="center">
+  <a href="https://studionet.genlayer.com/contracts/0x2D046FB04072172DDAb65a1EF0fb00B5B4318A31">Live on studionet</a> &middot;
+  <a href="RUBRIC.md">Scoring Rubric</a>
+</p>
+
+---
 
 A standalone GenLayer Intelligent Contract that determines whether a sealed freelance invoice is **PAYABLE**, **INFLATED**, or **FABRICATED** by cross-referencing a public timesheet URL and a repository commit log against the claimed hours and agreed hourly rate.
 

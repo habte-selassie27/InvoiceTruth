@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 120">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="120" rx="16" fill="#0f172a"/>
+  <text x="32" y="78" font-family="system-ui,-apple-system,sans-serif" font-size="48" font-weight="800" fill="url(#g)">Invoice</text>
+  <text x="262" y="78" font-family="system-ui,-apple-system,sans-serif" font-size="48" font-weight="800" fill="#22d3ee">Truth</text>
+  <rect x="32" y="94" width="400" height="3" rx="1.5" fill="#22d3ee" opacity="0.4"/>
+  <text x="32" y="112" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#94a3b8" letter-spacing="2">INTELLIGENT CONTRACT &middot; GENLAYER</text>
+</svg>
