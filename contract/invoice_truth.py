@@ -163,3 +163,46 @@ def validate_open_params(
 
 def url_digest(url: str) -> str:
     return hashlib.sha256(url.encode()).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Enumerations (plain string constants — not stored as enums)
+# ---------------------------------------------------------------------------
+
+class CoverageSignal:
+    FULL = "FULL"
+    PARTIAL = "PARTIAL"
+    NONE = "NONE"
+
+
+class HoursAlignment:
+    CONSISTENT = "CONSISTENT"
+    MINOR_GAP = "MINOR_GAP"
+    MAJOR_GAP = "MAJOR_GAP"
+    UNVERIFIABLE = "UNVERIFIABLE"
+
+
+class AmountAlignment:
+    EXACT = "EXACT"
+    TOLERABLE = "TOLERABLE"
+    OVERSTATED = "OVERSTATED"
+    UNDERSTATED = "UNDERSTATED"
+
+
+class FabricationSignal:
+    NONE = "NONE"
+    SUSPECTED = "SUSPECTED"
+    CONFIRMED = "CONFIRMED"
+
+
+class InvoiceStatus:
+    PENDING = "PENDING"
+    ASSESSED = "ASSESSED"      # terminal — has a verdict
+    UNRESOLVABLE = "UNRESOLVABLE"  # non-terminal — retry allowed
+
+
+class Verdict:
+    PAYABLE = "PAYABLE"
+    INFLATED = "INFLATED"
+    FABRICATED = "FABRICATED"
+    UNRESOLVED = "UNRESOLVED"  # stored only when status = UNRESOLVABLE
