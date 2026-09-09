@@ -148,6 +148,17 @@ A traditional smart contract could not fetch the timesheet or commit log — tho
 
 InvoiceTruth holds no GEN, ETH, or any token. It is a verdict oracle. Dispute escrow and payment release belong to a separate escrow contract that calls `is_payable`.
 
+## Repository layout
+
+```
+invoice-truth/
+├── contract/invoice_truth.py   # Intelligent Contract (deploy this file)
+├── contract/glconfig.json      # studionet deploy config
+├── tests/test_invoice_truth.py # 24 direct-mode tests
+├── tests/conftest.py           # shared fixtures
+└── docs/                       # DESIGN.md, LIFECYCLE.md
+```
+
 ## License
 
 MIT
