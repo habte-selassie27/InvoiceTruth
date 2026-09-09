@@ -159,6 +159,57 @@ invoice-truth/
 └── docs/                       # DESIGN.md, LIFECYCLE.md
 ```
 
+## Deployment
+
+| Network | Address |
+|---|---|
+| studionet | `0x2D046FB04072172DDAb65a1EF0fb00B5B4318A31` |
+
+### End-to-end test (10 steps)
+
+```bash
+# 1. Switch to studionet
+genlayer network set studionet
+
+# 2. Lint the contract
+genvm-lint check contract/invoice_truth.py
+
+# 3. Run direct-mode tests (24 tests)
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python3 -m pytest tests/ -v
+
+# 4. Deploy
+genlayer deploy --contract contract/invoice_truth.py
+ADDR=0x2D046FB04072172DDAb65a1EF0fb00B5B4318A31
+
+# 5. Check invoice count (expect 0) and owner
+genlayer call $ADDR get_invoice_count
+genlayer call $ADDR get_owner
+
+# 6. Open an invoice: rate=10000/hr, 40h claimed, amount=400000 + two evidence URLs
+genlayer write $ADDR open_invoice --args 10000 40 400000 "https://raw.githubusercontent.com/habte-selassie27/InvoiceTruth/main/README.md" "https://github.com/habte-selassie27/InvoiceTruth/commits/main"
+
+# 7. Read it back (status PENDING, verdict empty) + count is now 1
+genlayer call $ADDR get_invoice --args 0
+genlayer call $ADDR get_verdict --args 0
+genlayer call $ADDR get_invoice_count
+
+# 8. Assess invoice 0 (runs validator consensus — slow, several minutes)
+genlayer write $ADDR assess_invoice --args 0
+
+# 9. Read the verdict + consumer predicate
+genlayer call $ADDR get_verdict --args 0
+genlayer call $ADDR is_payable --args 0
+genlayer call $ADDR get_invoice --args 0
+
+# 10. If a write seems stuck, check its receipt (rotation/retry status)
+genlayer receipt <txHashFromStep8>
+```
+
+**Notes:**
+- Expect a non-PAYABLE verdict in step 9. A README plus a commit list isn't a real timesheet, so validators will likely say FABRICATED/INFLATED — that's fine; you're testing the mechanics (seal -> assess -> terminal verdict + replay protection), not winning a dispute.
+- Step 8 is the slow one. Consensus needs leader + validator rounds; give it minutes and poll with `genlayer receipt`.
+- A replay attempt (`assess_invoice --args 0` again after ASSESSED) should revert.
+
 ## License
 
 MIT

@@ -1,85 +1,6 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
-# InvoiceTruth — Freelance Hours Verifier
-# GenLayer Intelligent Contract
-#
-# PURPOSE:
-#   Determines whether a sealed freelance invoice is PAYABLE, INFLATED,
-#   or FABRICATED by cross-referencing a timesheet URL and a repository
-#   commit log against the claimed hours and agreed hourly rate.
-#
-# TRUST MODEL:
-#   - The client (opener) seals the agreed rate and two evidence URLs at
-#     open time. Neither can be changed afterward.
-#   - Validators independently fetch both URLs inside the nondet boundary;
-#     they are never trusted with caller-supplied text.
-#   - The LLM is asked narrow closed observations; deterministic
-#     contract logic — not the model — derives the final verdict.
-#   - Integer arithmetic only; no floating-point division.
-#
-# VERDICT CODES:
-#   PAYABLE            — hours supported by both timesheet and commits;
-#                        billed amount matches rate x hours within tolerance
-#   INFLATED           — some work is evidenced but billed hours exceed
-#                        supported hours by > 10%
-#   FABRICATED         — no credible commit/timesheet evidence for the
-#                        claimed period; treat as fraudulent
-#   UNRESOLVABLE       — one or both evidence sources could not be fetched,
-#                        or validators failed to reach majority; no verdict
-#                        is stored and the case remains open for retry
-#
-# LIFECYCLE:
-#   open_invoice  ->  assess_invoice  ->  terminal (PAYABLE/INFLATED/FABRICATED)
-#   open_invoice  ->  assess_invoice  ->  UNRESOLVABLE  ->  assess_invoice (retry)
-#
-# KEY DESIGN CHOICES:
-#   1. Evidence URLs are sealed at open time with SHA-256 digest commitment
-#      over the URL strings; the digest is verified during assessment so
-#      swapped sources fail closed.
-#   2. Validator equivalence check binds commit_coverage, hours_alignment,
-#      amount_alignment, fabrication_signal, and source_reachable — five
-#      enumerable dimensions — plus the numeric claimed_hours_seen and
-#      supported_hours_seen fields, all compared exactly.
-#   3. Deterministic logic maps the observations to a verdict; the model
-#      never produces PAYABLE/INFLATED/FABRICATED directly. amount_alignment
-#      from the model is stored for audit but the 10% tolerance is
-#      RECOMPUTED from integers so a dishonest model cannot force PAYABLE.
-#   4. Replay protection: once a terminal verdict is stored, further
-#      assess_invoice calls revert.
-#   5. Integer-only math: all monetary values are in the smallest currency
-#      unit (e.g. cents or wei-equivalent); rate x hours multiplication
-#      stays in integers; 10% tolerance is checked as 10 x delta <= expected.
 
-try:
-    from genlayer import *
-    HAS_GENLAYER = True
-except ImportError:  # direct-mode local testing without GenVM
-    HAS_GENLAYER = False
-    from dataclasses import dataclass as _dataclass
-
-    def allow_storage(cls):
-        return _dataclass(cls)
-
-    class _Public:
-        @staticmethod
-        def write(fn):
-            return fn
-
-        @staticmethod
-        def view(fn):
-            return fn
-
-    class _DummyGL:
-        public = _Public()
-        Contract = object
-
-    gl = _DummyGL()  # type: ignore
-    u256 = int  # type: ignore
-    Address = str  # type: ignore
-    try:
-        TreeMap  # type: ignore[name-defined]
-    except NameError:
-        TreeMap = dict  # type: ignore
-
+from genlayer import *
 import hashlib
 import json
 from dataclasses import dataclass
@@ -99,56 +20,28 @@ def derive_verdict(
     rate_per_hour: int,
     claimed_amount: int,
 ) -> str:
-    """Deterministic verdict mapping. Mirror of the on-chain logic below.
-
-    Returns one of PAYABLE | INFLATED | FABRICATED | UNRESOLVED.
-    `amount_alignment` is advisory only: the 10% tolerance is recomputed
-    from integers so the model cannot bypass the INFLATED check.
-    """
     if not source_reachable:
         return "UNRESOLVED"
-
-    # Rule 1: confirmed fabrication wins over everything
     if fabrication_signal == "CONFIRMED":
         return "FABRICATED"
-
-    # Rule 2/3: no commits -> FABRICATED (timesheet alone is insufficient)
     if commit_coverage == "NONE":
         return "FABRICATED"
-
-    # Rule 4: suspected fabrication with major hour gap -> FABRICATED
     if fabrication_signal == "SUSPECTED" and hours_alignment == "MAJOR_GAP":
         return "FABRICATED"
-
     expected_amount = supported_hours * rate_per_hour
     if expected_amount == 0:
-        # No supported hours -> cannot be payable
         return "FABRICATED"
-
     delta = abs(claimed_amount - expected_amount)
     within_tolerance = (delta * 10) <= expected_amount
-    # Recomputed from integers; does not trust the model's amount_alignment.
     overstated_by_math = claimed_amount > expected_amount and not within_tolerance
-
-    # Rule 5: major hour gap without fabrication signal -> INFLATED
     if hours_alignment == "MAJOR_GAP":
         return "INFLATED"
-
-    # Rule 6: amount overstated beyond tolerance -> INFLATED
-    # (model label OR recomputed math; either triggers)
     if (amount_alignment == "OVERSTATED" or overstated_by_math) and not within_tolerance:
-        # Guard: UNDERSTATED far below expected with CONSISTENT alignment
-        # stays PAYABLE (freelancer under-billed); only over-billing inflates
-        # unless a gap/suspicion flag is also set (handled in Rule 7).
         if claimed_amount >= expected_amount or amount_alignment == "OVERSTATED":
             return "INFLATED"
-
-    # Rule 7: minor gap or suspected fabrication + outside tolerance -> INFLATED
     if (hours_alignment == "MINOR_GAP" or fabrication_signal == "SUSPECTED") \
             and not within_tolerance:
         return "INFLATED"
-
-    # Rule 8: all checks pass -> PAYABLE
     return "PAYABLE"
 
 
@@ -159,7 +52,6 @@ def validate_open_params(
     timesheet_url: str,
     repo_url: str,
 ) -> None:
-    """Shared validation for open_invoice (also unit-tested directly)."""
     assert rate_per_hour > 0, "Rate must be positive"
     assert claimed_hours > 0, "Claimed hours must be positive"
     assert claimed_amount > 0, "Claimed amount must be positive"
@@ -181,13 +73,11 @@ class CoverageSignal:
     PARTIAL = "PARTIAL"
     NONE = "NONE"
 
-
 class HoursAlignment:
     CONSISTENT = "CONSISTENT"
     MINOR_GAP = "MINOR_GAP"
     MAJOR_GAP = "MAJOR_GAP"
     UNVERIFIABLE = "UNVERIFIABLE"
-
 
 class AmountAlignment:
     EXACT = "EXACT"
@@ -195,24 +85,21 @@ class AmountAlignment:
     OVERSTATED = "OVERSTATED"
     UNDERSTATED = "UNDERSTATED"
 
-
 class FabricationSignal:
     NONE = "NONE"
     SUSPECTED = "SUSPECTED"
     CONFIRMED = "CONFIRMED"
 
-
 class InvoiceStatus:
     PENDING = "PENDING"
-    ASSESSED = "ASSESSED"      # terminal — has a verdict
-    UNRESOLVABLE = "UNRESOLVABLE"  # non-terminal — retry allowed
-
+    ASSESSED = "ASSESSED"
+    UNRESOLVABLE = "UNRESOLVABLE"
 
 class Verdict:
     PAYABLE = "PAYABLE"
     INFLATED = "INFLATED"
     FABRICATED = "FABRICATED"
-    UNRESOLVED = "UNRESOLVED"  # stored only when status = UNRESOLVABLE
+    UNRESOLVED = "UNRESOLVED"
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +125,7 @@ class InvoiceRecord:
     fabrication_signal: str
     supported_hours: u256
     assessed_count: u256
-    opened_at: str  # transaction datetime ISO string (no block numbers on GenVM)
+    opened_at: str
 
 
 # ---------------------------------------------------------------------------
@@ -246,16 +133,13 @@ class InvoiceRecord:
 # ---------------------------------------------------------------------------
 
 def _invoice_key(invoice_id) -> str:
-    """Decimal string key: TreeMap keys stay primitive (str)."""
     return str(int(invoice_id))
 
 
-class InvoiceTruthContract(gl.Contract):  # type: ignore
+class InvoiceTruthContract(gl.Contract):
     owner: Address
     invoice_count: u256
-    # str keys (decimal invoice ids): TreeMap key types stay primitive
-    # per the storage reference, which only demonstrates primitive keys.
-    invoices: TreeMap[str, InvoiceRecord]  # type: ignore
+    invoices: TreeMap[str, InvoiceRecord]
     max_invoices: u256
 
     def __init__(self) -> None:
@@ -276,12 +160,6 @@ class InvoiceTruthContract(gl.Contract):  # type: ignore
         timesheet_url: str,
         repo_url: str,
     ) -> u256:
-        """Seal an invoice for verification.
-
-        Stores rate/hours/amount plus both evidence URLs immutably and
-        commits to SHA-256(URL) digests verified at assessment time.
-        Returns the invoice ID.
-        """
         assert self.invoice_count < self.max_invoices, "Registry full"
         validate_open_params(
             int(rate_per_hour),
@@ -309,8 +187,6 @@ class InvoiceTruthContract(gl.Contract):  # type: ignore
             fabrication_signal="",
             supported_hours=u256(0),
             assessed_count=u256(0),
-            # No block numbers on GenVM; the tx datetime is the canonical
-            # deterministic timestamp (see Transaction Context reference).
             opened_at=str(gl.message_raw["datetime"]),
         )
         self.invoices[_invoice_key(invoice_id)] = rec
@@ -323,12 +199,6 @@ class InvoiceTruthContract(gl.Contract):  # type: ignore
 
     @gl.public.write
     def assess_invoice(self, invoice_id: u256) -> None:
-        """Run validator consensus over the sealed evidence URLs.
-
-        Any caller may trigger assessment; only the opener sealed the
-        evidence. Replay is blocked once a terminal verdict is stored.
-        UNRESOLVABLE cases may be retried.
-        """
         assert invoice_id < self.invoice_count, "Unknown invoice"
         key = _invoice_key(invoice_id)
         rec = self.invoices[key]
@@ -336,24 +206,16 @@ class InvoiceTruthContract(gl.Contract):  # type: ignore
         assert rec.status != InvoiceStatus.ASSESSED, \
             "Invoice already has a terminal verdict; replay rejected"
 
-        # Verify sealed digests (fail closed on swapped sources)
         assert rec.timesheet_digest == url_digest(rec.timesheet_url), \
             "Timesheet URL digest mismatch"
         assert rec.repo_digest == url_digest(rec.repo_url), \
             "Repo URL digest mismatch"
 
-        # Copy sealed parameters to memory (storage is inaccessible
-        # from inside nondet blocks; closure capture is the supported path)
         rate_per_hour = int(rec.rate_per_hour)
         claimed_hours = int(rec.claimed_hours)
         claimed_amount = int(rec.claimed_amount)
         timesheet_url = str(rec.timesheet_url)
         repo_url = str(rec.repo_url)
-
-        # --------------------------------------------------------------
-        # NONDET: each validator independently fetches both sources and
-        # returns closed observations + two integer fields.
-        # --------------------------------------------------------------
 
         def _decode_body(resp) -> str:
             body = getattr(resp, "body", resp)
@@ -488,7 +350,6 @@ Rules:
             }
 
         def validator_fn(leader_result) -> bool:
-            # Independent verification: re-run and compare binding fields.
             if not isinstance(leader_result, gl.vm.Return):
                 return False
             try:
@@ -514,10 +375,6 @@ Rules:
                 return False
 
         result = gl.vm.run_nondet_unsafe(leader_fn, validator_fn)
-
-        # --------------------------------------------------------------
-        # DETERMINISTIC VERDICT DERIVATION (integer-only)
-        # --------------------------------------------------------------
 
         supported_hours = u256(int(result["supported_hours_seen"]))
 
@@ -564,12 +421,6 @@ Rules:
 
     @gl.public.view
     def get_invoice(self, invoice_id: u256) -> str:
-        """Full invoice record as a JSON string.
-
-        Returns str (not dict): view return types must be fully specified
-        storage-encodable types, and the record mixes ints and strings,
-        so it is serialized deterministically with json.dumps.
-        """
         assert invoice_id < self.invoice_count, "Unknown invoice"
         rec = self.invoices[_invoice_key(invoice_id)]
         return json.dumps({
