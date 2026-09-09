@@ -559,3 +559,49 @@ Rules:
         )
         rec.status = InvoiceStatus.ASSESSED
         self.invoices[invoice_id] = rec
+
+    # -------------------------------------------------------------------
+    # Read methods
+    # -------------------------------------------------------------------
+
+    @gl.public.view
+    def get_invoice(self, invoice_id: u256) -> dict:
+        assert invoice_id < self.invoice_count, "Unknown invoice"
+        rec = self.invoices[invoice_id]
+        return {
+            "invoice_id": int(invoice_id),
+            "opener": rec.opener,
+            "rate_per_hour": int(rec.rate_per_hour),
+            "claimed_hours": int(rec.claimed_hours),
+            "claimed_amount": int(rec.claimed_amount),
+            "timesheet_url": rec.timesheet_url,
+            "repo_url": rec.repo_url,
+            "status": rec.status,
+            "verdict": rec.verdict,
+            "commit_coverage": rec.commit_coverage,
+            "hours_alignment": rec.hours_alignment,
+            "amount_alignment": rec.amount_alignment,
+            "fabrication_signal": rec.fabrication_signal,
+            "supported_hours": int(rec.supported_hours),
+            "assessed_count": int(rec.assessed_count),
+            "opened_at": int(rec.opened_at),
+        }
+
+    @gl.public.view
+    def get_verdict(self, invoice_id: u256) -> str:
+        assert invoice_id < self.invoice_count, "Unknown invoice"
+        rec = self.invoices[invoice_id]
+        return rec.verdict if rec.verdict else "PENDING"
+
+    @gl.public.view
+    def is_payable(self, invoice_id: u256) -> bool:
+        assert invoice_id < self.invoice_count, "Unknown invoice"
+        return self.invoices[invoice_id].verdict == Verdict.PAYABLE
+
+    @gl.public.view
+    def get_invoice_count(self) -> u256:
+        return self.invoice_count
+
+    @gl.public.view
+    def get_owner(self) -> str:
+        return self.owner
