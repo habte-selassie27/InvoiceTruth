@@ -160,3 +160,83 @@ class TestVerdictDerivation:
             claimed_amount=400000,
         )
         assert verdict == "FABRICATED"
+
+    def test_11_tolerance_boundary_exact_10_percent(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="FULL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="TOLERABLE",
+            fabrication_signal="NONE",
+            supported_hours=40,
+            rate_per_hour=10000,
+            claimed_amount=440000,
+        )
+        assert verdict == "PAYABLE"
+
+    def test_12_tolerance_boundary_just_over_10_percent(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="FULL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="OVERSTATED",
+            fabrication_signal="NONE",
+            supported_hours=40,
+            rate_per_hour=10000,
+            claimed_amount=440001,
+        )
+        assert verdict == "INFLATED"
+
+    def test_13_payable_understated_amount(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="FULL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="UNDERSTATED",
+            fabrication_signal="NONE",
+            supported_hours=40,
+            rate_per_hour=10000,
+            claimed_amount=360000,
+        )
+        assert verdict == "PAYABLE"
+
+    def test_14_suspected_fabrication_within_tolerance_payable(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="PARTIAL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="TOLERABLE",
+            fabrication_signal="SUSPECTED",
+            supported_hours=40,
+            rate_per_hour=10000,
+            claimed_amount=404000,
+        )
+        assert verdict == "PAYABLE"
+
+    def test_15_suspected_fabrication_outside_tolerance_inflated(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="PARTIAL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="OVERSTATED",
+            fabrication_signal="SUSPECTED",
+            supported_hours=40,
+            rate_per_hour=10000,
+            claimed_amount=450000,
+        )
+        assert verdict == "INFLATED"
+
+    def test_16_model_label_cannot_hide_overstatement(self):
+        # Dishonest model returns TOLERABLE while math is 25% over.
+        # Fixed logic recomputes tolerance -> must still be INFLATED.
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="FULL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="TOLERABLE",
+            fabrication_signal="NONE",
+            supported_hours=40,
+            rate_per_hour=10000,
+            claimed_amount=500000,
+        )
+        assert verdict == "INFLATED"
