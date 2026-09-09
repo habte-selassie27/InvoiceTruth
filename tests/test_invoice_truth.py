@@ -240,3 +240,39 @@ class TestVerdictDerivation:
             claimed_amount=500000,
         )
         assert verdict == "INFLATED"
+
+
+class TestParameterValidation:
+
+    def test_17_zero_rate_rejected(self):
+        with pytest.raises(AssertionError, match="Rate must be positive"):
+            validate_open_params(0, 40, 400000,
+                                 "https://example.com/timesheet",
+                                 "https://example.com/repo")
+
+    def test_18_zero_hours_rejected(self):
+        with pytest.raises(AssertionError, match="Claimed hours must be positive"):
+            validate_open_params(10000, 0, 400000,
+                                 "https://example.com/timesheet",
+                                 "https://example.com/repo")
+
+    def test_19_identical_urls_rejected(self):
+        url = "https://example.com/timesheet-data"
+        with pytest.raises(AssertionError, match="Evidence URLs must be distinct"):
+            validate_open_params(10000, 40, 400000, url, url)
+
+    def test_20_short_url_rejected(self):
+        with pytest.raises(AssertionError, match="timesheet_url too short"):
+            validate_open_params(10000, 40, 400000,
+                                 "http://x",
+                                 "https://example.com/repo-log")
+
+    def test_21_valid_params_accepted(self):
+        validate_open_params(10000, 40, 400000,
+                             "https://example.com/timesheet",
+                             "https://example.com/repo")
+
+    def test_22_url_digest_roundtrip(self):
+        url = "https://example.com/timesheet"
+        assert url_digest(url) == url_digest(url)
+        assert url_digest(url) != url_digest(url + "?v=2")
