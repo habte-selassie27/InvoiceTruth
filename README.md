@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="Images/logo.svg" width="400" alt="InvoiceTruth">
+  <img src="Images/logo.png" width="200" alt="InvoiceTruth">
 </p>
 
 <p align="center">
@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://studionet.genlayer.com/contracts/0x2D046FB04072172DDAb65a1EF0fb00B5B4318A31">Live on studionet</a> &middot;
+  <a href="https://explorer-studio.genlayer.com/address/0x89fd5Ddc2E96fd78E7bcCE2B86b30d5e41E6e6e5">Live on studionet</a> &middot;
   <a href="RUBRIC.md">Scoring Rubric</a>
 </p>
 
@@ -176,7 +176,7 @@ invoice-truth/
 
 | Network | Address |
 |---|---|
-| studionet | `0x2D046FB04072172DDAb65a1EF0fb00B5B4318A31` |
+| studionet | `0x89fd5Ddc2E96fd78E7bcCE2B86b30d5e41E6e6e5` |
 
 ### End-to-end test (10 steps)
 
@@ -184,42 +184,40 @@ invoice-truth/
 ```bash
 genlayer network set studionet
 ```
-<img src="Images/step1-network-set.png" width="800" alt="Step 1">
+<img src="Images/step1-network.png" width="800" alt="Step 1">
 
 **Step 2 — Lint the contract**
 ```bash
 genvm-lint check contract/invoice_truth.py
 ```
-<img src="Images/step2-lint-passed.png" width="800" alt="Step 2">
+<img src="Images/step23-lint-tests.png" width="800" alt="Step 2">
 
 **Step 3 — Run direct-mode tests (24 tests)**
 ```bash
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 PYTHONPATH=. python3 -m pytest tests/ -v
 ```
-<img src="Images/step3-tests-passed.png" width="800" alt="Step 3">
+<img src="Images/step23-lint-tests.png" width="800" alt="Step 3">
 
-**Step 4 — Deploy**
+**Step 4 — Deploy (via Studio Run & Debug)**
 ```bash
 genlayer deploy --contract contract/invoice_truth.py
-ADDR=0x2D046FB04072172DDAb65a1EF0fb00B5B4318A31
+ADDR=0x89fd5Ddc2E96fd78E7bcCE2B86b30d5e41E6e6e5
 ```
-<img src="Images/step4-deploy-params.png" width="800" alt="Step 4a">
-<img src="Images/step4-deploy-success.png" width="800" alt="Step 4b">
+Deployed from Studio's Run & Debug panel ([open in Studio](https://studio.genlayer.com/?import-contract=0x89fd5Ddc2E96fd78E7bcCE2B86b30d5e41E6e6e5)); the CLI command above is equivalent.
 
 **Step 5 — Check invoice count (expect 0) and owner**
 ```bash
 genlayer call $ADDR get_invoice_count
 genlayer call $ADDR get_owner
 ```
-<img src="Images/step5-get-invoice-count-zero.png" width="800" alt="Step 5a">
-<img src="Images/step5-get-owner.png" width="800" alt="Step 5b">
+<img src="Images/step5-count-owner.png" width="800" alt="Step 5">
 
 **Step 6 — Open an invoice**
 ```bash
 genlayer write $ADDR open_invoice --args 10000 40 400000 "https://raw.githubusercontent.com/habte-selassie27/InvoiceTruth/main/README.md" "https://github.com/habte-selassie27/InvoiceTruth/commits/main"
 ```
-<img src="Images/step6-open-invoice-receipt.png" width="800" alt="Step 6a">
-<img src="Images/step6-open-invoice-consensus.png" width="800" alt="Step 6b">
+<img src="Images/step6-open.png" width="800" alt="Step 6">
+<img src="Images/step6-open-receipt.png" width="800" alt="Step 6 receipt">
 
 **Step 7 — Read it back (status PENDING, verdict empty) + count is now 1**
 ```bash
@@ -227,17 +225,14 @@ genlayer call $ADDR get_invoice --args 0
 genlayer call $ADDR get_verdict --args 0
 genlayer call $ADDR get_invoice_count
 ```
-<img src="Images/step7-get-invoice-pending.png" width="800" alt="Step 7a">
-<img src="Images/step7-get-verdict-pending.png" width="800" alt="Step 7b">
-<img src="Images/step7-get-invoice-count-one.png" width="800" alt="Step 7c">
+<img src="Images/step7-pending.png" width="800" alt="Step 7">
 
 **Step 8 — Assess invoice 0 (runs validator consensus — slow, several minutes)**
 ```bash
 genlayer write $ADDR assess_invoice --args 0
 ```
-<img src="Images/step8-assess-invoice-receipt.png" width="800" alt="Step 8a">
-<img src="Images/step8-assess-invoice-consensus.png" width="800" alt="Step 8b">
-<img src="Images/step8-assess-consensus-detail.png" width="800" alt="Step 8c">
+<img src="Images/step8-assess.png" width="800" alt="Step 8">
+<img src="Images/step8-assess-receipt.png" width="800" alt="Step 8 receipt">
 
 **Step 9 — Read the verdict + consumer predicate**
 ```bash
@@ -245,9 +240,7 @@ genlayer call $ADDR get_verdict --args 0
 genlayer call $ADDR is_payable --args 0
 genlayer call $ADDR get_invoice --args 0
 ```
-<img src="Images/step9-get-verdict-fabricated.png" width="800" alt="Step 9a">
-<img src="Images/step9-is-payable-false.png" width="800" alt="Step 9b">
-<img src="Images/step9-get-invoice-assessed.png" width="800" alt="Step 9c">
+<img src="Images/step9-verdict.png" width="800" alt="Step 9">
 
 **Notes:**
 - Expect a non-PAYABLE verdict in step 9. A README plus a commit list isn't a real timesheet, so validators say FABRICATED — that's fine; you're testing the mechanics (seal -> assess -> terminal verdict + replay protection), not winning a dispute.
