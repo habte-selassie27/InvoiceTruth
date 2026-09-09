@@ -1,0 +1,4 @@
+{
+  "contract": "contract/invoice_truth.py",
+  "network": "studionet"
+}
