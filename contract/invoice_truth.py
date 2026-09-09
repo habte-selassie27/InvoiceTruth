@@ -127,14 +127,21 @@ def derive_verdict(
 
     delta = abs(claimed_amount - expected_amount)
     within_tolerance = (delta * 10) <= expected_amount
+    # Recomputed from integers; does not trust the model's amount_alignment.
+    overstated_by_math = claimed_amount > expected_amount and not within_tolerance
 
     # Rule 5: major hour gap without fabrication signal -> INFLATED
     if hours_alignment == "MAJOR_GAP":
         return "INFLATED"
 
     # Rule 6: amount overstated beyond tolerance -> INFLATED
-    if amount_alignment == "OVERSTATED" and not within_tolerance:
-        return "INFLATED"
+    # (model label OR recomputed math; either triggers)
+    if (amount_alignment == "OVERSTATED" or overstated_by_math) and not within_tolerance:
+        # Guard: UNDERSTATED far below expected with CONSISTENT alignment
+        # stays PAYABLE (freelancer under-billed); only over-billing inflates
+        # unless a gap/suspicion flag is also set (handled in Rule 7).
+        if claimed_amount >= expected_amount or amount_alignment == "OVERSTATED":
+            return "INFLATED"
 
     # Rule 7: minor gap or suspected fabrication + outside tolerance -> INFLATED
     if (hours_alignment == "MINOR_GAP" or fabrication_signal == "SUSPECTED") \
