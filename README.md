@@ -114,7 +114,7 @@ Terminal assessments are replay-protected; `assess_invoice` on an ASSESSED invoi
 |---|---|---|
 | `open_invoice(rate, hours, amount, ts_url, repo_url)` | write | Seal a new invoice; returns invoice_id |
 | `assess_invoice(invoice_id)` | write (nondet) | Run validator consensus and store verdict |
-| `get_invoice(invoice_id)` | view | Full invoice record as dict |
+| `get_invoice(invoice_id)` | view | Full invoice record as JSON string |
 | `get_verdict(invoice_id)` | view | Verdict string; consumer-facing oracle |
 | `is_payable(invoice_id)` | view | Boolean predicate for other contracts |
 | `get_invoice_count()` | view | Total invoices registered |

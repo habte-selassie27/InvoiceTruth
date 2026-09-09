@@ -219,60 +219,43 @@ class Verdict:
 # Storage record
 # ---------------------------------------------------------------------------
 
-try:
-    @allow_storage
-    @dataclass
-    class InvoiceRecord:
-        opener: str
-        rate_per_hour: u256
-        claimed_hours: u256
-        claimed_amount: u256
-        timesheet_url: str
-        repo_url: str
-        timesheet_digest: str
-        repo_digest: str
-        status: str
-        verdict: str
-        commit_coverage: str
-        hours_alignment: str
-        amount_alignment: str
-        fabrication_signal: str
-        supported_hours: u256
-        assessed_count: u256
-        opened_at: u256
-except Exception:
-    # Fallback for stub environments where @dataclass composition differs
-    from dataclasses import dataclass
-
-    @dataclass
-    class InvoiceRecord:  # type: ignore[no-redef]
-        opener: str = ""
-        rate_per_hour: int = 0
-        claimed_hours: int = 0
-        claimed_amount: int = 0
-        timesheet_url: str = ""
-        repo_url: str = ""
-        timesheet_digest: str = ""
-        repo_digest: str = ""
-        status: str = "PENDING"
-        verdict: str = ""
-        commit_coverage: str = ""
-        hours_alignment: str = ""
-        amount_alignment: str = ""
-        fabrication_signal: str = ""
-        supported_hours: int = 0
-        assessed_count: int = 0
-        opened_at: int = 0
+@allow_storage
+@dataclass
+class InvoiceRecord:
+    opener: Address
+    rate_per_hour: u256
+    claimed_hours: u256
+    claimed_amount: u256
+    timesheet_url: str
+    repo_url: str
+    timesheet_digest: str
+    repo_digest: str
+    status: str
+    verdict: str
+    commit_coverage: str
+    hours_alignment: str
+    amount_alignment: str
+    fabrication_signal: str
+    supported_hours: u256
+    assessed_count: u256
+    opened_at: str  # transaction datetime ISO string (no block numbers on GenVM)
 
 
 # ---------------------------------------------------------------------------
 # Contract
 # ---------------------------------------------------------------------------
 
+def _invoice_key(invoice_id) -> str:
+    """Decimal string key: TreeMap keys stay primitive (str)."""
+    return str(int(invoice_id))
+
+
 class InvoiceTruthContract(gl.Contract):  # type: ignore
-    owner: str
+    owner: Address
     invoice_count: u256
-    invoices: TreeMap[u256, InvoiceRecord]  # type: ignore
+    # str keys (decimal invoice ids): TreeMap key types stay primitive
+    # per the storage reference, which only demonstrates primitive keys.
+    invoices: TreeMap[str, InvoiceRecord]  # type: ignore
     max_invoices: u256
 
     def __init__(self) -> None:
@@ -326,9 +309,11 @@ class InvoiceTruthContract(gl.Contract):  # type: ignore
             fabrication_signal="",
             supported_hours=u256(0),
             assessed_count=u256(0),
-            opened_at=u256(gl.message.block_number),
+            # No block numbers on GenVM; the tx datetime is the canonical
+            # deterministic timestamp (see Transaction Context reference).
+            opened_at=str(gl.message_raw["datetime"]),
         )
-        self.invoices[invoice_id] = rec
+        self.invoices[_invoice_key(invoice_id)] = rec
         self.invoice_count = invoice_id + u256(1)
         return invoice_id
 
@@ -345,7 +330,8 @@ class InvoiceTruthContract(gl.Contract):  # type: ignore
         UNRESOLVABLE cases may be retried.
         """
         assert invoice_id < self.invoice_count, "Unknown invoice"
-        rec = self.invoices[invoice_id]
+        key = _invoice_key(invoice_id)
+        rec = self.invoices[key]
 
         assert rec.status != InvoiceStatus.ASSESSED, \
             "Invoice already has a terminal verdict; replay rejected"
@@ -378,7 +364,7 @@ class InvoiceTruthContract(gl.Contract):  # type: ignore
                     return ""
             return str(body)
 
-        def leader_fn() -> dict:
+        def leader_fn():
             try:
                 ts_resp = gl.nondet.web.get(timesheet_url)
                 timesheet_content = _decode_body(ts_resp)
@@ -544,7 +530,7 @@ Rules:
             rec.fabrication_signal = str(result["fabrication_signal"])
             rec.supported_hours = supported_hours
             rec.assessed_count = rec.assessed_count + u256(1)
-            self.invoices[invoice_id] = rec
+            self.invoices[key] = rec
             return
 
         cov = str(result["commit_coverage"])
@@ -570,19 +556,25 @@ Rules:
             claimed_amount=claimed_amount,
         )
         rec.status = InvoiceStatus.ASSESSED
-        self.invoices[invoice_id] = rec
+        self.invoices[key] = rec
 
     # -------------------------------------------------------------------
     # Read methods
     # -------------------------------------------------------------------
 
     @gl.public.view
-    def get_invoice(self, invoice_id: u256) -> dict:
+    def get_invoice(self, invoice_id: u256) -> str:
+        """Full invoice record as a JSON string.
+
+        Returns str (not dict): view return types must be fully specified
+        storage-encodable types, and the record mixes ints and strings,
+        so it is serialized deterministically with json.dumps.
+        """
         assert invoice_id < self.invoice_count, "Unknown invoice"
-        rec = self.invoices[invoice_id]
-        return {
+        rec = self.invoices[_invoice_key(invoice_id)]
+        return json.dumps({
             "invoice_id": int(invoice_id),
-            "opener": rec.opener,
+            "opener": str(rec.opener),
             "rate_per_hour": int(rec.rate_per_hour),
             "claimed_hours": int(rec.claimed_hours),
             "claimed_amount": int(rec.claimed_amount),
@@ -596,24 +588,24 @@ Rules:
             "fabrication_signal": rec.fabrication_signal,
             "supported_hours": int(rec.supported_hours),
             "assessed_count": int(rec.assessed_count),
-            "opened_at": int(rec.opened_at),
-        }
+            "opened_at": rec.opened_at,
+        })
 
     @gl.public.view
     def get_verdict(self, invoice_id: u256) -> str:
         assert invoice_id < self.invoice_count, "Unknown invoice"
-        rec = self.invoices[invoice_id]
+        rec = self.invoices[_invoice_key(invoice_id)]
         return rec.verdict if rec.verdict else "PENDING"
 
     @gl.public.view
     def is_payable(self, invoice_id: u256) -> bool:
         assert invoice_id < self.invoice_count, "Unknown invoice"
-        return self.invoices[invoice_id].verdict == Verdict.PAYABLE
+        return self.invoices[_invoice_key(invoice_id)].verdict == Verdict.PAYABLE
 
     @gl.public.view
     def get_invoice_count(self) -> u256:
         return self.invoice_count
 
     @gl.public.view
-    def get_owner(self) -> str:
+    def get_owner(self) -> Address:
         return self.owner
