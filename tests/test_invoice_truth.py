@@ -276,3 +276,32 @@ class TestParameterValidation:
         url = "https://example.com/timesheet"
         assert url_digest(url) == url_digest(url)
         assert url_digest(url) != url_digest(url + "?v=2")
+
+
+class TestIntegerArithmetic:
+
+    def test_23_large_rate_no_overflow_risk(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="FULL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="EXACT",
+            fabrication_signal="NONE",
+            supported_hours=1_000_000,
+            rate_per_hour=1_000_000_000,
+            claimed_amount=1_000_000_000_000_000,
+        )
+        assert verdict == "PAYABLE"
+
+    def test_24_single_hour_exact_match(self):
+        verdict = derive_verdict(
+            source_reachable=True,
+            commit_coverage="PARTIAL",
+            hours_alignment="CONSISTENT",
+            amount_alignment="EXACT",
+            fabrication_signal="NONE",
+            supported_hours=1,
+            rate_per_hour=5000,
+            claimed_amount=5000,
+        )
+        assert verdict == "PAYABLE"
